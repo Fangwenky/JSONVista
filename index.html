@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📋 JSONVista - JSON工具箱</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Fira Code', monospace; background: #1e1e2e; color: #cdd6f4; min-height: 100vh; }
+        
+        header { background: linear-gradient(135deg, #1e1e2e, #313244); padding: 15px 30px; border-bottom: 1px solid #45475a; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { background: linear-gradient(135deg, #89b4fa, #f38ba8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 1.5rem; }
+        
+        .container { display: flex; height: calc(100vh - 60px); }
+        
+        /* Sidebar */
+        .sidebar { width: 200px; background: #181825; padding: 20px 0; border-right: 1px solid #45475a; }
+        .sidebar-item { padding: 12px 20px; cursor: pointer; color: #a6adc8; transition: all 0.2s; }
+        .sidebar-item:hover { background: #313244; color: #cdd6f4; }
+        .sidebar-item.active { background: #89b4fa; color: #1e1e2e; font-weight: bold; }
+        
+        /* Main */
+        .main { flex: 1; display: flex; flex-direction: column; }
+        
+        /* Toolbar */
+        .toolbar { background: #313244; padding: 10px 20px; display: flex; gap: 10px; border-bottom: 1px solid #45475a; }
+        .btn { background: #45475a; border: none; padding: 8px 16px; border-radius: 6px; color: #cdd6f4; cursor: pointer; font-size: 0.85rem; }
+        .btn:hover { background: #585b70; }
+        .btn.primary { background: #89b4fa; color: #1e1e2e; }
+        
+        /* Editor */
+        .editor { flex: 1; display: flex; }
+        .input-panel, .output-panel { flex: 1; display: flex; flex-direction: column; border-right: 1px solid #45475a; }
+        .panel-header { background: #313244; padding: 10px 20px; font-size: 0.85rem; color: #a6adc8; border-bottom: 1px solid #45475a; }
+        textarea { flex: 1; background: #1e1e2e; border: none; padding: 20px; color: #cdd6f4; font-family: 'Fira Code', monospace; font-size: 14px; line-height: 1.6; resize: none; }
+        textarea:focus { outline: none; }
+        textarea::placeholder { color: #6c7086; }
+        
+        /* Output */
+        .output-panel { border-right: none; }
+        #output { background: #11111b; overflow: auto; }
+        
+        /* Tree View */
+        .json-tree { padding: 20px; font-family: 'Fira Code', monospace; font-size: 14px; line-height: 1.8; }
+        .key { color: #89b4fa; }
+        .string { color: #a6e3a1; }
+        .number { color: #fab387; }
+        .boolean { color: #f38ba8; }
+        .null { color: #6c7086; }
+        .collapser { cursor: pointer; color: #6c7086; margin-right: 5px; }
+        .collapser:hover { color: #cdd6f4; }
+        
+        /* Error */
+        .error { color: #f38ba8; padding: 20px; }
+        
+        /* Stats */
+        .stats { display: flex; gap: 20px; padding: 10px 20px; background: #313244; font-size: 0.85rem; color: #a6adc8; }
+        
+        /* Tools specific */
+        .tools-welcome { padding: 40px; text-align: center; }
+        .tools-welcome h2 { color: #89b4fa; margin-bottom: 20px; }
+        .tools-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 20px; }
+        .tool-card { background: #313244; padding: 20px; border-radius: 10px; cursor: pointer; transition: all 0.3s; }
+        .tool-card:hover { transform: translateY(-3px); background: #45475a; }
+        .tool-card h3 { color: #89b4fa; margin-bottom: 10px; }
+        .tool-card p { color: #a6adc8; font-size: 0.9rem; }
+        
+        /* Mini Tools */
+        .mini-tools { padding: 20px; }
+        .mini-tool { background: #313244; padding: 20px; border-radius: 10px; margin-bottom: 15px; }
+        .mini-tool h3 { color: #fab387; margin-bottom: 15px; }
+        .mini-tool input { width: 100%; background: #1e1e2e; border: 1px solid #45475a; padding: 10px; border-radius: 6px; color: #cdd6f4; margin-bottom: 10px; }
+        
+        @media (max-width: 768px) {
+            .container { flex-direction: column; }
+            .sidebar { width: 100%; display: flex; overflow-x: auto; }
+            .editor { flex-direction: column; }
+            .input-panel, .output-panel { height: 50%; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📋 JSONVista</h1>
+        <span style="color:#6c7086">JSON工具箱</span>
+    </header>
+    
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-item active" onclick="showTool('format')">✨ 格式化</div>
+            <div class="sidebar-item" onclick="showTool('validate')">✅ 验证</div>
+            <div class="sidebar-item" onclick="showTool('tree')">🌲 树视图</div>
+            <div class="sidebar-item" onclick="showTool('compare')">⚖️ 对比</div>
+            <div class="sidebar-item" onclick="showTool('minify')">📦 压缩</div>
+            <div class="sidebar-item" onclick="showTool('path')">🔍 路径</div>
+            <div class="sidebar-item" onclick="showTool('convert')">🔄 转换</div>
+            <div class="sidebar-item" onclick="showTool('base64')">📨 Base64</div>
+        </div>
+        
+        <div class="main">
+            <!-- Format Tool -->
+            <div id="tool-format" class="tool">
+                <div class="toolbar">
+                    <button class="btn primary" onclick="formatJSON()">✨ 格式化</button>
+                    <button class="btn" onclick="copyOutput()">📋 复制</button>
+                    <button class="btn" onclick="clearAll()">🗑️ 清空</button>
+                </div>
+                <div class="editor">
+                    <div class="input-panel">
+                        <div class="panel-header">输入 JSON</div>
+                        <textarea id="input" placeholder='{"name": "JSONVista", "features": ["format", "validate", "tree"]}'></textarea>
+                    </div>
+                    <div class="output-panel">
+                        <div class="panel-header">输出</div>
+                        <textarea id="output" readonly placeholder="格式化结果..."></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Validate Tool -->
+            <div id="tool-validate" class="tool" style="display:none">
+                <div class="toolbar">
+                    <button class="btn primary" onclick="validateJSON()">✅ 验证</button>
+                </div>
+                <div class="editor">
+                    <div class="input-panel">
+                        <div class="panel-header">输入 JSON</div>
+                        <textarea id="validate-input" placeholder="输入要验证的JSON..."></textarea>
+                    </div>
+                    <div class="output-panel">
+                        <div class="panel-header">验证结果</div>
+                        <div id="validate-output" style="padding:20px"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tree View Tool -->
+            <div id="tool-tree" class="tool" style="display:none">
+                <div class="toolbar">
+                    <button class="btn primary" onclick="renderTree()">🌲 生成树</button>
+                </div>
+                <div class="editor">
+                    <div class="input-panel">
+                        <div class="panel-header">输入 JSON</div>
+                        <textarea id="tree-input" placeholder="输入JSON..."></textarea>
+                    </div>
+                    <div class="output-panel">
+                        <div class="panel-header">树视图</div>
+                        <div id="tree-output" class="json-tree"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Compare Tool -->
+            <div id="tool-compare" class="tool" style="display:none">
+                <div class="toolbar">
+                    <button class="btn primary" onclick="compareJSON()">⚖️ 对比</button>
+                </div>
+                <div class="editor">
+                    <div class="input-panel">
+                        <div class="panel-header">JSON 1</div>
+                        <textarea id="compare-input1" placeholder='{"a":1,"b":2}'></textarea>
+                    </div>
+                    <div class="output-panel">
+                        <div class="panel-header">JSON 2</div>
+                        <textarea id="compare-input2" placeholder='{"a":1,"c":3}'></textarea>
+                    </div>
+                </div>
+                <div id="compare-output" style="padding:20px;background:#11111b"></div>
+            </div>
+            
+            <!-- Minify Tool -->
+            <div id="tool-minify" class="tool" style="display:none">
+                <div class="toolbar">
+                    <button class="btn primary" onclick="minifyJSON()">📦 压缩</button>
+                </div>
+                <div class="editor">
+                    <div class="input-panel">
+                        <div class="panel-header">输入格式化的JSON</div>
+                        <textarea id="minify-input" placeholder="输入JSON..."></textarea>
+                    </div>
+                    <div class="output-panel">
+                        <div class="panel-header">压缩结果</div>
+                        <textarea id="minify-output" readonly></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Path Tool -->
+            <div id="tool-path" class="tool" style="display:none">
+                <div class="toolbar">
+                    <input type="text" id="jsonpath" placeholder="$.store.book[*].author" style="flex:1;background:#1e1e2e;border:1px solid #45475a;padding:8px;border-radius:6px;color:#cdd6f4">
+                    <button class="btn primary" onclick="queryJSON()">🔍 查询</button>
+                </div>
+                <div class="editor">
+                    <div class="input-panel">
+                        <div class="panel-header">输入 JSON</div>
+                        <textarea id="path-input" placeholder="输入JSON..."></textarea>
+                    </div>
+                    <div class="output-panel">
+                        <div class="panel-header">查询结果</div>
+                        <div id="path-output" style="padding:20px;background:#11111b;white-space:pre-wrap"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Convert Tool -->
+            <div id="tool-convert" class="tool" style="display:none">
+                <div class="toolbar">
+                    <select id="convert-type" style="background:#1e1e2e;border:1px solid #45475a;padding:8px;border-radius:6px;color:#cdd6f4">
+                        <option value="json2xml">JSON → XML</option>
+                        <option value="json2csv">JSON → CSV</option>
+                        <option value="json2yaml">JSON → YAML</option>
+                        <option value="xml2json">XML → JSON</option>
+                    </select>
+                    <button class="btn primary" onclick="convertJSON()">🔄 转换</button>
+                </div>
+                <div class="editor">
+                    <div class="input-panel">
+                        <div class="panel-header">输入</div>
+                        <textarea id="convert-input" placeholder="输入..."></textarea>
+                    </div>
+                    <div class="output-panel">
+                        <div class="panel-header">输出</div>
+                        <textarea id="convert-output" readonly></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Base64 Tool -->
+            <div id="tool-base64" class="tool" style="display:none">
+                <div class="toolbar">
+                    <button class="btn primary" onclick="encodeBase64()">📨 编码</button>
+                    <button class="btn" onclick="decodeBase64()">📬 解码</button>
+                </div>
+                <div class="editor">
+                    <div class="input-panel">
+                        <div class="panel-header">输入文本/JSON</div>
+                        <textarea id="base64-input" placeholder="输入..."></textarea>
+                    </div>
+                    <div class="output-panel">
+                        <div class="panel-header">输出</div>
+                        <textarea id="base64-output" readonly></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentTool = 'format';
+        
+        function showTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+            document.querySelector(`.sidebar-item[onclick="showTool('${tool}')"]`).classList.add('active');
+            document.querySelectorAll('.tool').forEach(t => t.style.display = 'none');
+            document.getElementById('tool-' + tool).style.display = 'block';
+        }
+        
+        // Format
+        function formatJSON() {
+            const input = document.getElementById('input').value;
+            try {
+                const obj = JSON.parse(input);
+                document.getElementById('output').value = JSON.stringify(obj, null, 2);
+            } catch (e) {
+                document.getElementById('output').value = '❌ 错误: ' + e.message;
+            }
+        }
+        
+        // Validate
+        function validateJSON() {
+            const input = document.getElementById('validate-input').value;
+            const output = document.getElementById('validate-output');
+            try {
+                const obj = JSON.parse(input);
+                output.innerHTML = '<span style="color:#a6e3a1">✅ 有效的JSON</span><br><br>类型: ' + typeof obj + '<br>键数量: ' + Object.keys(obj).length;
+            } catch (e) {
+                output.innerHTML = '<span style="color:#f38ba8">❌ 无效的JSON</span><br><br>错误: ' + e.message;
+            }
+        }
+        
+        // Tree View
+        function renderTree() {
+            const input = document.getElementById('tree-input').value;
+            const output = document.getElementById('tree-output');
+            try {
+                const obj = JSON.parse(input);
+                output.innerHTML = jsonToTree(obj);
+            } catch (e) {
+                output.innerHTML = '<div class="error">❌ ' + e.message + '</div>';
+            }
+        }
+        
+        function jsonToTree(obj, indent = 0) {
+            const spaces = '  '.repeat(indent);
+            if (obj === null) return '<span class="null">null</span>';
+            if (typeof obj === 'boolean') return '<span class="boolean">' + obj + '</span>';
+            if (typeof obj === 'number') return '<span class="number">' + obj + '</span>';
+            if (typeof obj === 'string') return '<span class="string">"' + obj + '"</span>';
+            
+            if (Array.isArray(obj)) {
+                if (obj.length === 0) return '[]';
+                let html = '[';
+                obj.forEach((item, i) => {
+                    html += (i > 0 ? ',<br>' + spaces + '  ' : '') + jsonToTree(item, indent + 1);
+                });
+                return html + ']';
+            }
+            
+            if (typeof obj === 'object') {
+                const keys = Object.keys(obj);
+                if (keys.length === 0) return '{}';
+                let html = '{<br>';
+                keys.forEach((key, i) => {
+                    html += (i > 0 ? ',<br>' + spaces + '  ' : '') + '<span class="key">"' + key + '"</span>: ' + jsonToTree(obj[key], indent + 1);
+                });
+                return html + '}';
+            }
+            return String(obj);
+        }
+        
+        // Compare
+        function compareJSON() {
+            const input1 = document.getElementById('compare-input1').value;
+            const input2 = document.getElementById('compare-input2').value;
+            const output = document.getElementById('compare-output');
+            
+            try {
+                const obj1 = JSON.parse(input1);
+                const obj2 = JSON.parse(input2);
+                
+                const diff = getDiff(obj1, obj2);
+                output.innerHTML = diff || '✅ 两个JSON完全相同';
+            } catch (e) {
+                output.innerHTML = '❌ ' + e.message;
+            }
+        }
+        
+        function getDiff(obj1, obj2, path = '') {
+            let diff = '';
+            const allKeys = new Set([...Object.keys(obj1 || {}), ...Object.keys(obj2 || {})]);
+            
+            allKeys.forEach(key => {
+                const p = path ? path + '.' + key : key;
+                if (!(key in obj1)) {
+                    diff += `<div style="color:#a6e3a1">+ ${p}: ${JSON.stringify(obj2[key])}</div>`;
+                } else if (!(key in obj2)) {
+                    diff += `<div style="color:#f38ba8">- ${p}: ${JSON.stringify(obj1[key])}</div>`;
+                } else if (JSON.stringify(obj1[key]) !== JSON.stringify(obj2[key])) {
+                    if (typeof obj1[key] === 'object' && typeof obj2[key] === 'object') {
+                        diff += getDiff(obj1[key], obj2[key], p);
+                    } else {
+                        diff += `<div style="color:#fab387">≠ ${p}: ${JSON.stringify(obj1[key])} → ${JSON.stringify(obj2[key])}</div>`;
+                    }
+                }
+            });
+            return diff;
+        }
+        
+        // Minify
+        function minifyJSON() {
+            const input = document.getElementById('minify-input').value;
+            try {
+                const obj = JSON.parse(input);
+                document.getElementById('minify-output').value = JSON.stringify(obj);
+            } catch (e) {
+                document.getElementById('minify-output').value = '❌ ' + e.message;
+            }
+        }
+        
+        // JSONPath (simplified)
+        function queryJSON() {
+            const input = document.getElementById('path-input').value;
+            const path = document.getElementById('jsonpath').value;
+            const output = document.getElementById('path-output');
+            
+            try {
+                const obj = JSON.parse(input);
+                const result = simpleJsonPath(obj, path);
+                output.textContent = JSON.stringify(result, null, 2);
+            } catch (e) {
+                output.textContent = '❌ ' + e.message;
+            }
+        }
+        
+        function simpleJsonPath(obj, path) {
+            if (!path || path === '$') return obj;
+            const parts = path.replace(/^\$\.?/, '').split('.');
+            let current = obj;
+            for (const part of parts) {
+                if (part === '*') {
+                    return Array.isArray(current) ? current : Object.values(current);
+                }
+                current = current ? current[part] : undefined;
+                if (current === undefined) return null;
+            }
+            return current;
+        }
+        
+        // Convert
+        function convertJSON() {
+            const input = document.getElementById('convert-input').value;
+            const type = document.getElementById('convert-type').value;
+            const output = document.getElementById('convert-output');
+            
+            try {
+                if (type === 'json2xml') {
+                    const obj = JSON.parse(input);
+                    output.value = jsonToXML(obj);
+                } else if (type === 'json2csv') {
+                    const obj = JSON.parse(input);
+                    output.value = jsonToCSV(Array.isArray(obj) ? obj : [obj]);
+                } else if (type === 'json2yaml') {
+                    const obj = JSON.parse(input);
+                    output.value = jsonToYAML(obj);
+                } else if (type === 'xml2json') {
+                    output.value = xmlToJSON(input);
+                }
+            } catch (e) {
+                output.value = '❌ ' + e.message;
+            }
+        }
+        
+        function jsonToXML(obj) {
+            let xml = '<?xml version="1.0"?>\n<root>\n';
+            function convert(o, indent = '  ') {
+                for (const [k, v] of Object.entries(o)) {
+                    if (typeof v === 'object' && v !== null) {
+                        xml += indent + '<' + k + '>\n';
+                        convert(v, indent + '  ');
+                        xml += indent + '</' + k + '>\n';
+                    } else {
+                        xml += indent + '<' + k + '>' + v + '</' + k + '>\n';
+                    }
+                }
+            }
+            convert(obj);
+            return xml + '</root>';
+        }
+        
+        function jsonToCSV(arr) {
+            if (!arr.length) return '';
+            const keys = Object.keys(arr[0]);
+            let csv = keys.join(',') + '\n';
+            arr.forEach(row => {
+                csv += keys.map(k => JSON.stringify(row[k] ?? '')).join(',') + '\n';
+            });
+            return csv;
+        }
+        
+        function jsonToYAML(obj, indent = 0) {
+            let yaml = '';
+            const spaces = '  '.repeat(indent);
+            
+            if (obj === null) return 'null\n';
+            if (typeof obj === 'boolean') return obj + '\n';
+            if (typeof obj === 'number') return obj + '\n';
+            if (typeof obj === 'string') return obj.includes('\n') ? '|\n' + obj.split('\n').map(l => spaces + '  ' + l).join('\n') : '"' + obj + '"\n';
+            
+            if (Array.isArray(obj)) {
+                obj.forEach(item => {
+                    if (typeof item === 'object') {
+                        yaml += spaces + '-\n' + jsonToYAML(item, indent + 1);
+                    } else {
+                        yaml += spaces + '- ' + item + '\n';
+                    }
+                });
+            } else if (typeof obj === 'object') {
+                for (const [k, v] of Object.entries(obj)) {
+                    if (typeof v === 'object' && v !== null) {
+                        yaml += spaces + k + ':\n' + jsonToYAML(v, indent + 1);
+                    } else {
+                        yaml += spaces + k + ': ' + jsonToYAML(v, indent).trim() + '\n';
+                    }
+                }
+            }
+            return yaml;
+        }
+        
+        function xmlToJSON(xml) {
+            // Simple XML parser
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xml, 'text/xml');
+            return JSON.stringify(xmlToJson(doc.documentElement), null, 2);
+        }
+        
+        function xmlToJson(node) {
+            if (node.nodeType === 3) return node.textContent.trim();
+            const obj = {};
+            if (node.attributes) {
+                obj['@attributes'] = {};
+                for (const attr of node.attributes) {
+                    obj['@attributes'][attr.name] = attr.value;
+                }
+            }
+            for (const child of node.childNodes) {
+                if (child.nodeType === 1) {
+                    const name = child.nodeName;
+                    const value = xmlToJson(child);
+                    if (obj[name]) {
+                        if (!Array.isArray(obj[name])) obj[name] = [obj[name]];
+                        obj[name].push(value);
+                    } else {
+                        obj[name] = value;
+                    }
+                }
+            }
+            return obj;
+        }
+        
+        // Base64
+        function encodeBase64() {
+            const input = document.getElementById('base64-input').value;
+            try {
+                document.getElementById('base64-output').value = btoa(unescape(encodeURIComponent(input)));
+            } catch (e) {
+                document.getElementById('base64-output').value = '❌ ' + e.message;
+            }
+        }
+        
+        function decodeBase64() {
+            const input = document.getElementById('base64-input').value;
+            try {
+                document.getElementById('base64-output').value = decodeURIComponent(escape(atob(input)));
+            } catch (e) {
+                document.getElementById('base64-output').value = '❌ 无效的Base64';
+            }
+        }
+        
+        // Utils
+        function copyOutput() {
+            const output = document.getElementById('output');
+            output.select();
+            document.execCommand('copy');
+            alert('已复制!');
+        }
+        
+        function clearAll() {
+            document.getElementById('input').value = '';
+            document.getElementById('output').value = '';
+        }
+    </script>
+</body>
+</html>
